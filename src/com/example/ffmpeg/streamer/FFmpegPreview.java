@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2012 Renato L. F. Cunha <http://renatocunha.com>
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -154,7 +155,8 @@ public class FFmpegPreview extends Activity {
  * to the surface. We need to center the SurfaceView because not all devices have cameras that
  * support preview sizes at the same aspect ratio as the device's display.
  */
-class Preview extends ViewGroup implements SurfaceHolder.Callback {
+class Preview extends ViewGroup implements SurfaceHolder.Callback,
+        Camera.PreviewCallback {
     private final String TAG = "Preview";
 
     SurfaceView mSurfaceView;
@@ -188,6 +190,7 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
        setCamera(camera);
        try {
            camera.setPreviewDisplay(mHolder);
+           camera.setPreviewCallback(this);
        } catch (IOException exception) {
            Log.e(TAG, "IOException caused by setPreviewDisplay()", exception);
        }
@@ -304,4 +307,10 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
         mCamera.startPreview();
     }
 
+    public void onPreviewFrame(byte[] data, Camera camera) {
+        // nothing for now
+    }
+
 }
+
+/* vim: set ts=4 sw=4 expandtab softtabstop=4 */
