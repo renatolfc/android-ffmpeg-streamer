@@ -20,6 +20,7 @@ package com.example.ffmpeg.streamer;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
 import android.hardware.Camera.Size;
@@ -35,12 +36,18 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.List;
+import java.util.Map;
 
 // ----------------------------------------------------------------------
 
 public class FFmpegPreview extends Activity {
+    private final String TAG = "FFmpegPreview";
+
     private Preview mPreview;
     Camera mCamera;
     int numberOfCameras;
@@ -67,12 +74,43 @@ public class FFmpegPreview extends Activity {
 
         // Find the ID of the default camera
         CameraInfo cameraInfo = new CameraInfo();
-            for (int i = 0; i < numberOfCameras; i++) {
-                Camera.getCameraInfo(i, cameraInfo);
-                if (cameraInfo.facing == CameraInfo.CAMERA_FACING_BACK) {
-                    defaultCameraId = i;
-                }
+        for (int i = 0; i < numberOfCameras; i++) {
+            Camera.getCameraInfo(i, cameraInfo);
+            if (cameraInfo.facing == CameraInfo.CAMERA_FACING_BACK) {
+                defaultCameraId = i;
             }
+        }
+
+        // Copy the assets if needed
+        copyAssets();
+        callFFmpeg();
+    }
+
+    private void callFFmpeg() {
+        ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-h", "long");
+        Map<String, String> env = pb.environment();
+        env.put("PATH", env.get("PATH") + ":" + getFilesDir());
+        env.put("LD_LIBRARY_PATH", env.get("LD_LIBRARY_PATH") + ":" + getFilesDir());
+        try {
+            Process p = pb.start();
+            p.waitFor();
+            printStream(p.getInputStream());
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    private void printStream(InputStream in) throws IOException {
+        int read;
+        byte[] buffer = new byte[1024];
+        while((read = in.read(buffer)) != -1) {
+            System.out.write(buffer, 0, read);
+        }
+        System.out.flush();
     }
 
     @Override
@@ -144,6 +182,45 @@ public class FFmpegPreview extends Activity {
             return true;
         default:
             return super.onOptionsItemSelected(item);
+        }
+    }
+
+    private void copyAssets() {
+        AssetManager assetManager = getAssets();
+        String[] files = null;
+        try {
+            files = assetManager.list("");
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to get asset file list.", e);
+        }
+        for (String filename : files) {
+            File root = getFilesDir();
+            File file = new File(root, filename);
+            if(file.exists())
+                continue;
+            InputStream in = null;
+            OutputStream out = null;
+            try {
+                Runtime.getRuntime().exec("chmod 771 " + file);
+                in = assetManager.open(filename);
+                out = openFileOutput(filename, Context.MODE_PRIVATE);
+                copyFile(in, out);
+                in.close();
+                in = null;
+                out.flush();
+                out.close();
+                out = null;
+            } catch (IOException e) {
+                Log.e(TAG, "Failed to copy asset file: " + filename, e);
+            }
+        }
+    }
+
+    private void copyFile(InputStream in, OutputStream out) throws IOException {
+        int read;
+        byte[] buffer = new byte[1024];
+        while((read = in.read(buffer)) != -1) {
+            out.write(buffer, 0, read);
         }
     }
 }
