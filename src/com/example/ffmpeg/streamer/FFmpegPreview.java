@@ -30,6 +30,8 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.Window;
 import android.view.WindowManager;
+import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,6 +59,7 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         // Hide the window title.
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
         // Create a RelativeLayout container that will hold a SurfaceView,
         // and set it as the content of our activity.
@@ -115,6 +118,7 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         mCamera = Camera.open();
         cameraCurrentlyLocked = defaultCameraId;
         mPreview.setCamera(mCamera);
+        mPreview.setPreviewCallback(this);
     }
 
     @Override
@@ -216,6 +220,10 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         while((read = in.read(buffer)) != -1) {
             out.write(buffer, 0, read);
         }
+    }
+
+    public void onConfigurationChanged(Configuration whatever) {
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
     }
 
     public void onPreviewFrame(byte[] data, Camera camera) {
