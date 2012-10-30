@@ -175,10 +175,6 @@ public class Preview extends ViewGroup implements SurfaceHolder.Callback {
         mCamera.setParameters(parameters);
         mCamera.startPreview();
     }
-
-    public void onPreviewFrame(byte[] data, Camera camera) {
-        // nothing for now
-    }
 }
 
 /* vim: set ts=4 sw=4 expandtab softtabstop=4 */
