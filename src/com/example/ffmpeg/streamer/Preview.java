@@ -45,6 +45,8 @@ public class Preview extends ViewGroup implements SurfaceHolder.Callback {
         if (mCamera != null) {
             mSupportedPreviewSizes = mCamera.getParameters().getSupportedPreviewSizes();
             requestLayout();
+            if (mPreviewCallback != null)
+                camera.setPreviewCallback(mPreviewCallback);
         }
     }
 
@@ -58,8 +60,6 @@ public class Preview extends ViewGroup implements SurfaceHolder.Callback {
        setCamera(camera);
        try {
            camera.setPreviewDisplay(mHolder);
-           if (mPreviewCallback != null)
-               camera.setPreviewCallback(mPreviewCallback);
        } catch (IOException exception) {
            Log.e(TAG, "IOException caused by setPreviewDisplay()", exception);
        }
@@ -176,8 +176,8 @@ public class Preview extends ViewGroup implements SurfaceHolder.Callback {
         mCamera.startPreview();
     }
 
-    public void onPreviewFrame(byte[] data, Camera camera) {
-        // nothing for now
+    public Camera.Size getPreviewSize() {
+    	return mPreviewSize;
     }
 }
 
