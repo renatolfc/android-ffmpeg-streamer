@@ -20,7 +20,9 @@ package com.example.ffmpeg.streamer;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.content.res.AssetManager;
+import android.content.res.Configuration;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
 import android.os.Bundle;
@@ -46,6 +48,8 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
     Camera mCamera;
     int numberOfCameras;
     int cameraCurrentlyLocked;
+    private InputStream mFFmpegInputStream;
+    private OutputStream mFFmpegOutputStream;
 
     // The first rear facing camera
     int defaultCameraId;
@@ -57,11 +61,13 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         // Hide the window title.
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
         // Create a RelativeLayout container that will hold a SurfaceView,
         // and set it as the content of our activity.
         mPreview = new Preview(this);
         setContentView(mPreview);
+        mPreview.setPreviewCallback(this);
 
         // Find the total number of cameras available
         numberOfCameras = Camera.getNumberOfCameras();
@@ -77,34 +83,47 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
 
         // Copy the assets if needed
         copyAssets();
-        callFFmpeg();
     }
 
-    private void callFFmpeg() {
-        ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-h", "long");
+    private void setupFFmpeg(Camera.Size videoDimensions) {
+        String dimensions = new String(Integer.valueOf(videoDimensions.width).toString())
+                            + "x" +
+                            new String(Integer.valueOf(videoDimensions.height).toString());
+        final ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-y", "-v", "debug",
+                "-nostdin", "-f", "rawvideo", "-vcodec", "rawvideo",
+                "-pix_fmt", "nv21", "-video_size", dimensions, "-i", "-",
+                "-crf", "30", "-preset", "ultrafast",
+                "/mnt/sdcard/output.mp4");
         Map<String, String> env = pb.environment();
         env.put("PATH", env.get("PATH") + ":" + getFilesDir());
         env.put("LD_LIBRARY_PATH", env.get("LD_LIBRARY_PATH") + ":" + getFilesDir());
-        try {
-            Process p = pb.start();
-            p.waitFor();
-            printStream(p.getInputStream());
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
-
-    private void printStream(InputStream in) throws IOException {
-        int read;
-        byte[] buffer = new byte[1024];
-        while((read = in.read(buffer)) != -1) {
-            System.out.write(buffer, 0, read);
-        }
-        System.out.flush();
+        pb.redirectErrorStream(true);
+        new Thread() {
+            public void run() {
+                try {
+                    Process p = pb.start();
+                    mFFmpegInputStream = p.getInputStream();
+                    mFFmpegOutputStream = p.getOutputStream();
+                    Log.d(TAG, "FFmpeg has been started");
+                    p.waitFor();
+                    Log.d(TAG, "FFmpeg has stopped");
+                    byte[] buffer = new byte[10240];
+                    int read;
+                    read = mFFmpegInputStream.read(buffer);
+                    System.out.write(buffer, 0, read);
+                    mFFmpegInputStream = null;
+                    mFFmpegOutputStream = null;
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                    mFFmpegInputStream = null;
+                    mFFmpegOutputStream = null;
+                }
+            }
+        }.start();
     }
 
     @Override
@@ -115,6 +134,11 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         mCamera = Camera.open();
         cameraCurrentlyLocked = defaultCameraId;
         mPreview.setCamera(mCamera);
+        mPreview.post(new Runnable() {
+            public void run() {
+                setupFFmpeg(mPreview.getPreviewSize());
+            }
+        });
     }
 
     @Override
@@ -219,6 +243,20 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
     }
 
     public void onPreviewFrame(byte[] data, Camera camera) {
+    	try {
+    		if (mFFmpegOutputStream != null) {
+    			mFFmpegOutputStream.write(data);
+    			mFFmpegOutputStream.flush();
+    		}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
+
+    public void onConfigurationChanged(Configuration whatever) {
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        super.onConfigurationChanged(whatever);
     }
 }
 
