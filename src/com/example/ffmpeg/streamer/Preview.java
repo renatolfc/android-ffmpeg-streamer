@@ -181,7 +181,7 @@ public class Preview extends ViewGroup implements SurfaceHolder.Callback {
     }
 
     public Camera.Size getPreviewSize() {
-    	return mPreviewSize;
+        return mPreviewSize;
     }
 }
 
