@@ -89,7 +89,7 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         String dimensions = new String(Integer.valueOf(videoDimensions.width).toString())
                             + "x" +
                             new String(Integer.valueOf(videoDimensions.height).toString());
-        final ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-y", "-v", "debug",
+        final ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-y", "-v", "quiet",
                 "-nostdin", "-f", "rawvideo", "-vcodec", "rawvideo",
                 "-pix_fmt", "nv21", "-video_size", dimensions, "-i", "-",
                 "-crf", "30", "-preset", "ultrafast",
@@ -107,10 +107,6 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
                     Log.d(TAG, "FFmpeg has been started");
                     p.waitFor();
                     Log.d(TAG, "FFmpeg has stopped");
-                    byte[] buffer = new byte[10240];
-                    int read;
-                    read = mFFmpegInputStream.read(buffer);
-                    System.out.write(buffer, 0, read);
                     mFFmpegInputStream = null;
                     mFFmpegOutputStream = null;
                 } catch (IOException e) {
