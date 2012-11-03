@@ -67,7 +67,6 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         // and set it as the content of our activity.
         mPreview = new Preview(this);
         setContentView(mPreview);
-        mPreview.setPreviewCallback(this);
 
         // Find the total number of cameras available
         numberOfCameras = Camera.getNumberOfCameras();
@@ -83,6 +82,13 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
 
         // Copy the assets if needed
         copyAssets();
+
+        // Start the FFmpeg process after the creation of the preview
+        mPreview.post(new Runnable() {
+            public void run() {
+                setupFFmpeg(mPreview.getPreviewSize());
+            }
+        });
     }
 
     private void setupFFmpeg(Camera.Size videoDimensions) {
@@ -130,16 +136,13 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         mCamera = Camera.open();
         cameraCurrentlyLocked = defaultCameraId;
         mPreview.setCamera(mCamera);
-        mPreview.post(new Runnable() {
-            public void run() {
-                setupFFmpeg(mPreview.getPreviewSize());
-            }
-        });
+        mPreview.setPreviewCallback(this);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        mPreview.setPreviewCallback(null);
 
         // Because the Camera object is a shared resource, it's very
         // important to release it when the activity is paused.
