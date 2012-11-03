@@ -127,7 +127,11 @@ public class Preview extends ViewGroup implements SurfaceHolder.Callback {
     public void surfaceDestroyed(SurfaceHolder holder) {
         // Surface will be destroyed when we return, so stop the preview.
         if (mCamera != null) {
-            mCamera.stopPreview();
+            try {
+                mCamera.stopPreview();
+            } catch (RuntimeException e) {
+                // The camera's been released, forget about it.
+            }
         }
     }
 
