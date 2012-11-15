@@ -34,20 +34,26 @@ import android.view.Window;
 import android.view.WindowManager;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Locale;
 import java.util.Map;
 
 // ----------------------------------------------------------------------
 
 public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
-    private final String TAG = "FFmpegPreview";
+    private static final String TAG = "FFmpegPreview";
+    private static final String FFSERVER_CONF = "ffserver.conf";
+    private static final String FEED_FFM_NAME = "feed1.ffm";
 
     private Preview mPreview;
     Camera mCamera;
     int numberOfCameras;
     int cameraCurrentlyLocked;
+    private File mFFmPath;
+    private File mFFserverConfigPath;
     private InputStream mFFmpegInputStream;
     private OutputStream mFFmpegOutputStream;
     private InputStream mFFserverInputStream;
@@ -56,9 +62,49 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
     // The first rear facing camera
     int defaultCameraId;
 
+    private static final String FFSERVER_TEMPLATE = 
+        "Port 8090\n" +
+        "RTSPPort %d\n" +
+        "BindAddress 0.0.0.0\n" +
+        "MaxHTTPConnections 2000\n" +
+        "MaxClients 1000\n" +
+        "MaxBandwidth 1000\n" +
+        "CustomLog -\n" +
+        "NoDaemon\n" +
+        "\n" +
+        "<Feed feed1.ffm>\n" +
+        "    File %s\n" +
+        "    FileMaxSize 5M\n" +
+        "    ACL allow 127.0.0.1\n" +
+        "</Feed>\n" +
+        "\n" +
+        "<Stream livefeed>\n" +
+        "    Feed feed1.ffm\n" +
+        "    Format rtp\n" +
+        "    VideoBitRate %d\n" +
+        "    VideoBufferSize 40\n" +
+        "    VideoFrameRate %d\n" +
+        "    VideoSize %dx%d\n" +
+        "    VideoGopSize 12\n" +
+        "    NoAudio\n" +
+        "</Stream>"
+    ;
+
+    private void newFFserverConfig(int rtspPort, int bps, int fps, int width,
+            int height) throws IOException {
+        String conf = String.format(Locale.US, FFSERVER_TEMPLATE, rtspPort,
+                mFFmPath, bps, fps, width, height);
+        FileOutputStream fos = new FileOutputStream(mFFserverConfigPath);
+        fos.write(conf.getBytes());
+        fos.close();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        mFFmPath = new File(getExternalCacheDir(), FEED_FFM_NAME);
+        mFFserverConfigPath = new File(getCacheDir(), FFSERVER_CONF);
 
         // Hide the window title.
         requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -88,7 +134,7 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         // Start the FFmpeg process after the creation of the preview
         mPreview.post(new Runnable() {
             public void run() {
-                setupFFserver();
+                setupFFserver(mPreview.getPreviewSize());
                 setupFFmpeg(mPreview.getPreviewSize());
             }
         });
@@ -103,9 +149,17 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         return pb;
     }
 
-    private void setupFFserver() {
-        final ProcessBuilder pb = setupProcess("ffsever", "-f",
-                getFilesDir() + "/ffserver.conf");
+    private void setupFFserver(Camera.Size videoDimensions) {
+        try {
+            newFFserverConfig(7654, 800, 15, videoDimensions.width,
+                    videoDimensions.height);
+        } catch (IOException e) {
+            // XXX: It will not work. Warn the user.
+            e.printStackTrace();
+        }
+
+        final ProcessBuilder pb = setupProcess("ffserver", "-f",
+                mFFserverConfigPath.toString());
         new Thread() {
             public void run() {
                 try {
