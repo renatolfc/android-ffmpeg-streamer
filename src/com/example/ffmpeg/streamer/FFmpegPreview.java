@@ -94,13 +94,18 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         });
     }
 
-    private void setupFFserver() {
-        final ProcessBuilder pb = new ProcessBuilder("ffserver", "-f",
-                getFilesDir() + "/ffserver.conf");
+    private final ProcessBuilder setupProcess(String... args) {
+        final ProcessBuilder pb = new ProcessBuilder(args);
         Map<String, String> env = pb.environment();
         env.put("PATH", env.get("PATH") + ":" + getFilesDir());
         env.put("LD_LIBRARY_PATH", env.get("LD_LIBRARY_PATH") + ":" + getFilesDir());
         pb.redirectErrorStream(true);
+        return pb;
+    }
+
+    private void setupFFserver() {
+        final ProcessBuilder pb = setupProcess("ffsever", "-f",
+                getFilesDir() + "/ffserver.conf");
         new Thread() {
             public void run() {
                 try {
@@ -128,15 +133,11 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         String dimensions = new String(Integer.valueOf(videoDimensions.width).toString())
                             + "x" +
                             new String(Integer.valueOf(videoDimensions.height).toString());
-        final ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-y", "-v", "quiet",
+        final ProcessBuilder pb = setupProcess("ffmpeg", "-y", "-v", "quiet",
                 "-nostdin", "-f", "rawvideo", "-vcodec", "rawvideo",
                 "-pix_fmt", "nv21", "-video_size", dimensions, "-i", "-",
                 "-crf", "30", "-preset", "ultrafast", "-tune", "zerolatency",
                 "http://127.0.0.1:8090/feed1.ffm");
-        Map<String, String> env = pb.environment();
-        env.put("PATH", env.get("PATH") + ":" + getFilesDir());
-        env.put("LD_LIBRARY_PATH", env.get("LD_LIBRARY_PATH") + ":" + getFilesDir());
-        pb.redirectErrorStream(true);
         new Thread() {
             public void run() {
                 try {
