@@ -58,6 +58,9 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
     private OutputStream mFFmpegOutputStream;
     private InputStream mFFserverInputStream;
     private OutputStream mFFserverOutputStream;
+    private Process mFFmpegProcess;
+    private Process mFFserverProcess;
+    private byte[] mBuffer;
 
     // The first rear facing camera
     int defaultCameraId;
@@ -134,8 +137,13 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         // Start the FFmpeg process after the creation of the preview
         mPreview.post(new Runnable() {
             public void run() {
-                setupFFserver(mPreview.getPreviewSize());
-                setupFFmpeg(mPreview.getPreviewSize());
+                final Camera.Size ps = mPreview.getPreviewSize();
+                final int bufferSize = ps.width * ps.height * 12 / 8;
+                mBuffer = new byte[bufferSize];
+
+                setupFFserver(ps);
+                setupFFmpeg(ps);
+                mPreview.setPreviewCallback(FFmpegPreview.this, mBuffer);
             }
         });
     }
@@ -162,22 +170,23 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
                 mFFserverConfigPath.toString());
         new Thread() {
             public void run() {
-                try {
-                    Process p = pb.start();
-                    mFFserverInputStream = p.getInputStream();
-                    mFFserverOutputStream = p.getOutputStream();
-                    Log.d(TAG, "FFserver has been started");
-                    p.waitFor();
-                    Log.d(TAG, "FFserver  has stopped");
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (InterruptedException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } finally {
-                    mFFserverInputStream = null;
-                    mFFserverOutputStream = null;
+                boolean keepGoing = true;
+                while (keepGoing) {
+                    try {
+                        mFFserverProcess = pb.start();
+                        mFFserverInputStream = mFFserverProcess.getInputStream();
+                        mFFserverOutputStream = mFFserverProcess.getOutputStream();
+                        Log.d(TAG, "FFserver has been started");
+                        mFFserverProcess.waitFor();
+                        Log.d(TAG, "FFserver  has stopped");
+                    } catch (IOException e) {
+                        keepGoing = false;
+                    } catch (InterruptedException e) {
+                        keepGoing = false;
+                    } finally {
+                        mFFserverInputStream = null;
+                        mFFserverOutputStream = null;
+                    }
                 }
             }
         }.start();
@@ -189,27 +198,28 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
                             new String(Integer.valueOf(videoDimensions.height).toString());
         final ProcessBuilder pb = setupProcess("ffmpeg", "-y", "-v", "quiet",
                 "-nostdin", "-f", "rawvideo", "-vcodec", "rawvideo",
-                "-pix_fmt", "nv21", "-video_size", dimensions, "-i", "-",
+                "-pix_fmt", "nv21", "-video_size", dimensions, "-i", "pipe:",
                 "-crf", "30", "-preset", "ultrafast", "-tune", "zerolatency",
                 "http://127.0.0.1:8090/feed1.ffm");
         new Thread() {
             public void run() {
-                try {
-                    Process p = pb.start();
-                    mFFmpegInputStream = p.getInputStream();
-                    mFFmpegOutputStream = p.getOutputStream();
-                    Log.d(TAG, "FFmpeg has been started");
-                    p.waitFor();
-                    Log.d(TAG, "FFmpeg has stopped");
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (InterruptedException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } finally {
-                    mFFmpegInputStream = null;
-                    mFFmpegOutputStream = null;
+                boolean keepGoing = true;
+                while (keepGoing) {
+                    try {
+                        Process p = pb.start();
+                        mFFmpegInputStream = p.getInputStream();
+                        mFFmpegOutputStream = p.getOutputStream();
+                        Log.d(TAG, "FFmpeg has been started");
+                        p.waitFor();
+                        Log.d(TAG, "FFmpeg has stopped");
+                    } catch (IOException e) {
+                        keepGoing = false;
+                    } catch (InterruptedException e) {
+                        keepGoing = false;
+                    } finally {
+                        mFFmpegInputStream = null;
+                        mFFmpegOutputStream = null;
+                    }
                 }
             }
         }.start();
@@ -223,13 +233,14 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         mCamera = Camera.open();
         cameraCurrentlyLocked = defaultCameraId;
         mPreview.setCamera(mCamera);
-        mPreview.setPreviewCallback(this);
+        if (mBuffer != null)
+            mPreview.setPreviewCallback(this, mBuffer);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        mPreview.setPreviewCallback(null);
+        mPreview.setPreviewCallback(null, null);
 
         // Because the Camera object is a shared resource, it's very
         // important to release it when the activity is paused.
@@ -335,14 +346,23 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
                 mFFmpegOutputStream.flush();
             }
         } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            // Broken pipe, just ignore it
         }
+        camera.addCallbackBuffer(data);
     }
 
     public void onConfigurationChanged(Configuration whatever) {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         super.onConfigurationChanged(whatever);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (mFFmpegProcess != null)
+            mFFmpegProcess.destroy();
+        if (mFFserverProcess != null)
+            mFFserverProcess.destroy();
     }
 }
 

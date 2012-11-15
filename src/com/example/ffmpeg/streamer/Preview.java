@@ -26,6 +26,7 @@ public class Preview extends ViewGroup implements SurfaceHolder.Callback {
     List<Size> mSupportedPreviewSizes;
     Camera mCamera;
     Camera.PreviewCallback mPreviewCallback;
+    byte[] mBuffer;
 
     Preview(Context context) {
         super(context);
@@ -45,15 +46,20 @@ public class Preview extends ViewGroup implements SurfaceHolder.Callback {
         if (mCamera != null) {
             mSupportedPreviewSizes = mCamera.getParameters().getSupportedPreviewSizes();
             requestLayout();
-            if (mPreviewCallback != null)
+            if (mPreviewCallback != null) {
+                camera.addCallbackBuffer(mBuffer);
                 camera.setPreviewCallback(mPreviewCallback);
+            }
         }
     }
 
-    public void setPreviewCallback(Camera.PreviewCallback p) {
+    public void setPreviewCallback(Camera.PreviewCallback p, byte[] buffer) {
+        mBuffer = buffer;
         mPreviewCallback = p;
-        if (mCamera != null)
-            mCamera.setPreviewCallback(p);
+        if (mCamera != null) {
+            mCamera.setPreviewCallbackWithBuffer(p);
+            mCamera.addCallbackBuffer(buffer);
+        }
     }
 
     public void switchCamera(Camera camera) {
