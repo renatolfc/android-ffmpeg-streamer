@@ -242,15 +242,15 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
     }
 
     public void onPreviewFrame(byte[] data, Camera camera) {
-    	try {
-    		if (mFFmpegOutputStream != null) {
-    			mFFmpegOutputStream.write(data);
-    			mFFmpegOutputStream.flush();
-    		}
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+        try {
+            if (mFFmpegOutputStream != null) {
+                mFFmpegOutputStream.write(data);
+                mFFmpegOutputStream.flush();
+            }
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void onConfigurationChanged(Configuration whatever) {
