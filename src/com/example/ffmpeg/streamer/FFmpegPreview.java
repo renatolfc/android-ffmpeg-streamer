@@ -50,6 +50,8 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
     int cameraCurrentlyLocked;
     private InputStream mFFmpegInputStream;
     private OutputStream mFFmpegOutputStream;
+    private InputStream mFFserverInputStream;
+    private OutputStream mFFserverOutputStream;
 
     // The first rear facing camera
     int defaultCameraId;
@@ -86,9 +88,41 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         // Start the FFmpeg process after the creation of the preview
         mPreview.post(new Runnable() {
             public void run() {
+                setupFFserver();
                 setupFFmpeg(mPreview.getPreviewSize());
             }
         });
+    }
+
+    private void setupFFserver() {
+        final ProcessBuilder pb = new ProcessBuilder("ffserver", "-f",
+                getFilesDir() + "/ffserver.conf");
+        Map<String, String> env = pb.environment();
+        env.put("PATH", env.get("PATH") + ":" + getFilesDir());
+        env.put("LD_LIBRARY_PATH", env.get("LD_LIBRARY_PATH") + ":" + getFilesDir());
+        pb.redirectErrorStream(true);
+        new Thread() {
+            public void run() {
+                try {
+                    Process p = pb.start();
+                    mFFserverInputStream = p.getInputStream();
+                    mFFserverOutputStream = p.getOutputStream();
+                    Log.d(TAG, "FFserver has been started");
+                    p.waitFor();
+                    Log.d(TAG, "FFserver  has stopped");
+                    mFFserverInputStream = null;
+                    mFFserverOutputStream = null;
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                    mFFserverInputStream = null;
+                    mFFserverOutputStream = null;
+                }
+            }
+        }.start();
     }
 
     private void setupFFmpeg(Camera.Size videoDimensions) {
@@ -98,8 +132,8 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
         final ProcessBuilder pb = new ProcessBuilder("ffmpeg", "-y", "-v", "quiet",
                 "-nostdin", "-f", "rawvideo", "-vcodec", "rawvideo",
                 "-pix_fmt", "nv21", "-video_size", dimensions, "-i", "-",
-                "-crf", "30", "-preset", "ultrafast",
-                "/mnt/sdcard/output.mp4");
+                "-crf", "30", "-preset", "ultrafast", "-tune", "zerolatency",
+                "http://127.0.0.1:8090/feed1.ffm");
         Map<String, String> env = pb.environment();
         env.put("PATH", env.get("PATH") + ":" + getFilesDir());
         env.put("LD_LIBRARY_PATH", env.get("LD_LIBRARY_PATH") + ":" + getFilesDir());
