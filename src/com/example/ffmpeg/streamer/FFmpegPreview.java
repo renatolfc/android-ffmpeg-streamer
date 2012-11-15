@@ -110,14 +110,13 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
                     Log.d(TAG, "FFserver has been started");
                     p.waitFor();
                     Log.d(TAG, "FFserver  has stopped");
-                    mFFserverInputStream = null;
-                    mFFserverOutputStream = null;
                 } catch (IOException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 } catch (InterruptedException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
+                } finally {
                     mFFserverInputStream = null;
                     mFFserverOutputStream = null;
                 }
@@ -147,14 +146,13 @@ public class FFmpegPreview extends Activity implements Camera.PreviewCallback {
                     Log.d(TAG, "FFmpeg has been started");
                     p.waitFor();
                     Log.d(TAG, "FFmpeg has stopped");
-                    mFFmpegInputStream = null;
-                    mFFmpegOutputStream = null;
                 } catch (IOException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 } catch (InterruptedException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
+                } finally {
                     mFFmpegInputStream = null;
                     mFFmpegOutputStream = null;
                 }
